@@ -22,13 +22,17 @@ int char_w = 10;
 int char_h = 14; 
 int window_w = 1280, window_h = 768;
 
-// Image data kept in CPU memory
-unsigned char *img_data = NULL;
+// Image data for animation frames
+unsigned char *img_normal = NULL;
+unsigned char *img_wink = NULL;
 int img_w, img_h, img_channels;
 
-// Fade state
+// Fade and Wink state
 float face_alpha = 0.0f;
 int face_timer = 0;
+
+int is_winking = 0;
+int wink_duration = 0;
 
 typedef enum {
     STATE_WAITING,
@@ -39,19 +43,34 @@ typedef enum {
 
 FadeState fade_state = STATE_WAITING;
 
-// Standard C function for keyboard input (fixes compile error)
 void keyboard_input(unsigned char key, int x, int y) {
-    if (key == 27) { // ESC key
-        if (img_data) free(img_data);
+    if (key == 27) { 
+        if (img_normal) free(img_normal);
+        if (img_wink) free(img_wink);
         exit(0); 
     }
 }
 
-void load_image(const char *filename) {
-    // Force loading 4 channels (RGBA) so we always know byte offsets
-    img_data = stbi_load(filename, &img_w, &img_h, &img_channels, 4);
-    if (!img_data) {
-        printf("Failed to load image: %s\n", filename);
+void load_images(const char *file_normal, const char *file_wink) {
+    // Load normal face
+    img_normal = stbi_load(file_normal, &img_w, &img_h, &img_channels, 4);
+    if (!img_normal) {
+        printf("Failed to load image: %s\n", file_normal);
+        exit(1);
+    }
+
+    // Load winking face
+    int w_w, w_h, w_c;
+    img_wink = stbi_load(file_wink, &w_w, &w_h, &w_c, 4);
+    if (!img_wink) {
+        printf("Failed to load image: %s\n", file_wink);
+        printf("Make sure you have created the second frame for the animation!\n");
+        exit(1);
+    }
+
+    // Safety check to prevent memory access violations
+    if (img_w != w_w || img_h != w_h) {
+        printf("Error: %s and %s must have the exact same dimensions!\n", file_normal, file_wink);
         exit(1);
     }
 }
@@ -64,7 +83,7 @@ void init_rain() {
     
     for (int x = 0; x < num_cols; x++) {
         drop_y[x] = rand() % num_rows;
-        drop_speed[x] = 0.2f + ((rand() % 10) / 20.0f); // Drops move slower on the grid
+        drop_speed[x] = 0.2f + ((rand() % 10) / 20.0f);
         
         for (int y = 0; y < num_rows; y++) {
             grid_chars[x][y] = 33 + (rand() % 94);
@@ -75,7 +94,7 @@ void init_rain() {
 
 void draw_char(float x, float y, char c, float r, float g, float b) {
     glColor3f(r, g, b);
-    glRasterPos2f(x, y + char_h); // Offset baseline so it draws inside the cell
+    glRasterPos2f(x, y + char_h);
     glutBitmapCharacter(GLUT_BITMAP_8_BY_13, c);
 }
 
@@ -83,12 +102,14 @@ void display() {
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // Calculate image placement bounds
-    float scale = 0.65f; // Face takes up 65% of screen width
+    float scale = 0.65f;
     float draw_w = window_w * scale;
     float draw_h = draw_w * ((float)img_h / img_w);
     float start_x = (window_w - draw_w) / 2.0f;
     float start_y = (window_h - draw_h) / 2.0f;
+
+    // Determine which image buffer to read from this frame
+    unsigned char *current_img = is_winking ? img_wink : img_normal;
 
     for (int x = 0; x < num_cols; x++) {
         for (int y = 0; y < num_rows; y++) {
@@ -96,44 +117,36 @@ void display() {
             float screen_x = x * char_w;
             float screen_y = y * char_h;
 
-            float r = 0.0f, g = intensity, b = 0.0f; // Default Matrix Green
+            float r = 0.0f, g = intensity, b = 0.0f;
 
-            // If it's the head of a drop, make it white
             if (intensity > 0.9f) {
                 r = intensity;
                 b = intensity;
             }
 
-            // --- CHECK IF CELL IS OVER THE FACE IMAGE ---
             if (screen_x >= start_x && screen_x < start_x + draw_w &&
                 screen_y >= start_y && screen_y < start_y + draw_h) {
                 
-                // Map the screen cell to the specific pixel in the image array
                 int px = (int)(((screen_x - start_x) / draw_w) * img_w);
                 int py = (int)(((screen_y - start_y) / draw_h) * img_h);
                 
-                // Fetch the pixel colors (4 bytes per pixel because we forced 4 channels)
                 int pixel_index = (py * img_w + px) * 4;
-                float img_r = img_data[pixel_index] / 255.0f;
-                float img_g = img_data[pixel_index + 1] / 255.0f;
-                float img_b = img_data[pixel_index + 2] / 255.0f;
+                float img_r = current_img[pixel_index] / 255.0f;
+                float img_g = current_img[pixel_index + 1] / 255.0f;
+                float img_b = current_img[pixel_index + 2] / 255.0f;
 
-                // Calculate brightness of this specific pixel
                 float luminance = (img_r + img_g + img_b) / 3.0f;
                 
-                // Illuminate background characters based on the photo
                 float face_baseline = face_alpha * luminance;
                 if (face_baseline > intensity) {
                     intensity = face_baseline;
                 }
 
-                // Morph the matrix colors into the photo colors
                 r = (r * (1.0f - face_alpha)) + (img_r * intensity * face_alpha);
                 g = (g * (1.0f - face_alpha)) + (img_g * intensity * face_alpha);
                 b = (b * (1.0f - face_alpha)) + (img_b * intensity * face_alpha);
             }
 
-            // Only draw characters that are bright enough to be seen
             if (intensity > 0.05f) {
                 draw_char(screen_x, screen_y, grid_chars[x][y], r, g, b);
             }
@@ -144,26 +157,23 @@ void display() {
 }
 
 void update_logic(int value) {
-    // 1. Decay the rain tails and mutate characters
     for (int x = 0; x < num_cols; x++) {
         for (int y = 0; y < num_rows; y++) {
             if (grid_intensity[x][y] > 0.0f) {
                 grid_intensity[x][y] -= 0.04f;
             }
-            // Add a "cipher" effect: randomly swap characters so the face feels alive
             if (rand() % 100 < 2) {
                 grid_chars[x][y] = 33 + (rand() % 94);
             }
         }
     }
 
-    // 2. Move drops down the grid
     for (int x = 0; x < num_cols; x++) {
         drop_y[x] += drop_speed[x];
         int head_row = (int)drop_y[x];
         
         if (head_row < num_rows) {
-            grid_intensity[x][head_row] = 1.0f; // Light up the head
+            grid_intensity[x][head_row] = 1.0f; 
             grid_chars[x][head_row] = 33 + (rand() % 94);
         } else if (drop_y[x] > num_rows + (rand() % 20)) {
             drop_y[x] = 0;
@@ -171,11 +181,11 @@ void update_logic(int value) {
         }
     }
 
-    // 3. Fade Logic
+    // Fade Logic
     face_timer++;
     switch (fade_state) {
         case STATE_WAITING:
-            if (face_timer > 300) { // Wait 5 seconds
+            if (face_timer > 300) { 
                 fade_state = STATE_FADING_IN;
                 face_timer = 0;
             }
@@ -189,7 +199,7 @@ void update_logic(int value) {
             }
             break;
         case STATE_HOLDING:
-            if (face_timer > 400) { // Hold for ~6 seconds
+            if (face_timer > 600) { // Hold for ~10 seconds
                 fade_state = STATE_FADING_OUT;
                 face_timer = 0;
             }
@@ -202,6 +212,27 @@ void update_logic(int value) {
                 face_timer = 0;
             }
             break;
+    }
+
+    // --- WINK LOGIC ---
+    // Only attempt to wink if the face is currently visible
+    if (fade_state == STATE_HOLDING && face_alpha > 0.8f) {
+        if (!is_winking) {
+            // ~1% chance to wink every frame (~1 wink every few seconds)
+            if (rand() % 100 == 0) {
+                is_winking = 1;
+                // Wink duration between 8 and 15 frames (120ms - 240ms)
+                wink_duration = 8 + (rand() % 8); 
+            }
+        } else {
+            // Count down the wink duration
+            wink_duration--;
+            if (wink_duration <= 0) {
+                is_winking = 0; // Open eyes again
+            }
+        }
+    } else {
+        is_winking = 0; // Ensure eyes are open if fading out
     }
 
     glutPostRedisplay();
@@ -225,9 +256,10 @@ int main(int argc, char **argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
     glutInitWindowSize(window_w, window_h);
-    glutCreateWindow("GLMatrix Face");
+    glutCreateWindow("GLMatrix Face Winking");
 
-    load_image("images/face.jpg");
+    // Load both animation frames
+    load_images("images/face.jpg", "images/facewink.jpg");
 
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
