@@ -6,6 +6,7 @@ This version uses a _Grid State_ rendering engine, insted of drawing arbitrary f
 - Pixel mapping for every character cell
 - Cipher blend (for every character overlapping face image)
 - Shifts active text color from green to image color
+- Live Mutation: Even when the face is fully visible, the characters making up the image are randomly re-rolling (`grid_chars[x][y] = 33 + (rand() % 94)`), giving the portrait a dynamic, crawling cipher effect.
 
 The name says it all :P
 
