@@ -20,7 +20,7 @@ int num_cols = 0;
 int num_rows = 0;
 int char_w = 10;
 int char_h = 14; 
-int window_w = 800, window_h = 600;
+int window_w = 1280, window_h = 768;
 
 // Image data kept in CPU memory
 unsigned char *img_data = NULL;
