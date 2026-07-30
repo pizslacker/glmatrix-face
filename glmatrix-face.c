@@ -227,7 +227,7 @@ int main(int argc, char **argv) {
     glutInitWindowSize(window_w, window_h);
     glutCreateWindow("GLMatrix Face");
 
-    load_image("face.jpg");
+    load_image("images/face.jpg");
 
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
