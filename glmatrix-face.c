@@ -225,7 +225,7 @@ int main(int argc, char **argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
     glutInitWindowSize(window_w, window_h);
-    glutCreateWindow("Cipher Face Matrix");
+    glutCreateWindow("GLMatrix Face");
 
     load_image("face.jpg");
 
