@@ -20,23 +20,21 @@ int num_cols = 0;
 int num_rows = 0;
 int char_w = 10;
 int char_h = 14; 
-int window_w = 1280, window_h = 768;
+int window_w = 800, window_h = 600;
 
-// Image data for animation frames
-unsigned char *img_normal = NULL;
-unsigned char *img_wink = NULL;
+// 3 Image Frames
+unsigned char *img_frames[3] = {NULL, NULL, NULL};
 int img_w, img_h, img_channels;
 
-// Fade and Wink state
+// Animation State
 float face_alpha = 0.0f;
-int face_timer = 0;
-
-int is_winking = 0;
-int wink_duration = 0;
+float smile_factor = 0.0f; // 0.0 = Neutral, 0.5 = Half, 1.0 = Full
+int state_timer = 0;
 
 typedef enum {
     STATE_WAITING,
     STATE_FADING_IN,
+    STATE_SMILING,
     STATE_HOLDING,
     STATE_FADING_OUT
 } FadeState;
@@ -45,34 +43,32 @@ FadeState fade_state = STATE_WAITING;
 
 void keyboard_input(unsigned char key, int x, int y) {
     if (key == 27) { 
-        if (img_normal) free(img_normal);
-        if (img_wink) free(img_wink);
+        for (int i = 0; i < 3; i++) {
+            if (img_frames[i]) free(img_frames[i]);
+        }
         exit(0); 
     }
 }
 
-void load_images(const char *file_normal, const char *file_wink) {
-    // Load normal face
-    img_normal = stbi_load(file_normal, &img_w, &img_h, &img_channels, 4);
-    if (!img_normal) {
-        printf("Failed to load image: %s\n", file_normal);
-        exit(1);
-    }
+void load_images(const char *file1, const char *file2, const char *file3) {
+    const char *filenames[3] = {file1, file2, file3};
+    int w[3], h[3], c[3];
 
-    // Load winking face
-    int w_w, w_h, w_c;
-    img_wink = stbi_load(file_wink, &w_w, &w_h, &w_c, 4);
-    if (!img_wink) {
-        printf("Failed to load image: %s\n", file_wink);
-        printf("Make sure you have created the second frame for the animation!\n");
-        exit(1);
+    for (int i = 0; i < 3; i++) {
+        img_frames[i] = stbi_load(filenames[i], &w[i], &h[i], &c[i], 4);
+        if (!img_frames[i]) {
+            printf("Failed to load image: %s\n", filenames[i]);
+            exit(1);
+        }
+        
+        if (i > 0 && (w[i] != w[0] || h[i] != h[0])) {
+            printf("Error: All images must be the exact same size!\n");
+            exit(1);
+        }
     }
-
-    // Safety check to prevent memory access violations
-    if (img_w != w_w || img_h != w_h) {
-        printf("Error: %s and %s must have the exact same dimensions!\n", file_normal, file_wink);
-        exit(1);
-    }
+    
+    img_w = w[0];
+    img_h = h[0];
 }
 
 void init_rain() {
@@ -108,9 +104,6 @@ void display() {
     float start_x = (window_w - draw_w) / 2.0f;
     float start_y = (window_h - draw_h) / 2.0f;
 
-    // Determine which image buffer to read from this frame
-    unsigned char *current_img = is_winking ? img_wink : img_normal;
-
     for (int x = 0; x < num_cols; x++) {
         for (int y = 0; y < num_rows; y++) {
             float intensity = grid_intensity[x][y];
@@ -120,20 +113,47 @@ void display() {
             float r = 0.0f, g = intensity, b = 0.0f;
 
             if (intensity > 0.9f) {
-                r = intensity;
-                b = intensity;
+                r = intensity; b = intensity;
             }
 
-            if (screen_x >= start_x && screen_x < start_x + draw_w &&
+            // If the cell is over the face and the face is visible
+            if (face_alpha > 0.0f && 
+                screen_x >= start_x && screen_x < start_x + draw_w &&
                 screen_y >= start_y && screen_y < start_y + draw_h) {
                 
                 int px = (int)(((screen_x - start_x) / draw_w) * img_w);
                 int py = (int)(((screen_y - start_y) / draw_h) * img_h);
-                
                 int pixel_index = (py * img_w + px) * 4;
-                float img_r = current_img[pixel_index] / 255.0f;
-                float img_g = current_img[pixel_index + 1] / 255.0f;
-                float img_b = current_img[pixel_index + 2] / 255.0f;
+                
+                // --- CROSSFADE LOGIC ---
+                unsigned char *imgA, *imgB;
+                float blend_t;
+
+                // Determine which two frames to blend based on the smile_factor
+                if (smile_factor < 0.5f) {
+                    imgA = img_frames[0]; // Neutral
+                    imgB = img_frames[1]; // Half-smile
+                    blend_t = smile_factor * 2.0f; // Scale 0.0-0.5 to 0.0-1.0
+                } else {
+                    imgA = img_frames[1]; // Half-smile
+                    imgB = img_frames[2]; // Full-smile
+                    blend_t = (smile_factor - 0.5f) * 2.0f; // Scale 0.5-1.0 to 0.0-1.0
+                }
+
+                // Fetch pixel from A
+                float rA = imgA[pixel_index] / 255.0f;
+                float gA = imgA[pixel_index + 1] / 255.0f;
+                float bA = imgA[pixel_index + 2] / 255.0f;
+
+                // Fetch pixel from B
+                float rB = imgB[pixel_index] / 255.0f;
+                float gB = imgB[pixel_index + 1] / 255.0f;
+                float bB = imgB[pixel_index + 2] / 255.0f;
+
+                // Calculate the final interpolated image pixel
+                float img_r = (rA * (1.0f - blend_t)) + (rB * blend_t);
+                float img_g = (gA * (1.0f - blend_t)) + (gB * blend_t);
+                float img_b = (bA * (1.0f - blend_t)) + (bB * blend_t);
 
                 float luminance = (img_r + img_g + img_b) / 3.0f;
                 
@@ -142,6 +162,7 @@ void display() {
                     intensity = face_baseline;
                 }
 
+                // Blend the matrix green with the image pixel
                 r = (r * (1.0f - face_alpha)) + (img_r * intensity * face_alpha);
                 g = (g * (1.0f - face_alpha)) + (img_g * intensity * face_alpha);
                 b = (b * (1.0f - face_alpha)) + (img_b * intensity * face_alpha);
@@ -157,6 +178,7 @@ void display() {
 }
 
 void update_logic(int value) {
+    // 1. Matrix logic
     for (int x = 0; x < num_cols; x++) {
         for (int y = 0; y < num_rows; y++) {
             if (grid_intensity[x][y] > 0.0f) {
@@ -181,62 +203,59 @@ void update_logic(int value) {
         }
     }
 
-    // Fade Logic
-    face_timer++;
+    // 2. State Machine Logic
+    state_timer++;
     switch (fade_state) {
         case STATE_WAITING:
-            if (face_timer > 300) { 
+            if (state_timer > 300) { // Wait 5 seconds
                 fade_state = STATE_FADING_IN;
-                face_timer = 0;
+                state_timer = 0;
             }
             break;
+            
         case STATE_FADING_IN:
-            face_alpha += 0.005f;
+            face_alpha += 0.01f;
             if (face_alpha >= 1.0f) {
                 face_alpha = 1.0f;
-                fade_state = STATE_HOLDING;
-                face_timer = 0;
+                fade_state = STATE_SMILING;
+                state_timer = 0;
             }
             break;
-        case STATE_HOLDING:
-            if (face_timer > 600) { // Hold for ~10 seconds
-                fade_state = STATE_FADING_OUT;
-                face_timer = 0;
-            }
-            break;
-        case STATE_FADING_OUT:
-            face_alpha -= 0.005f;
-            if (face_alpha <= 0.0f) {
-                face_alpha = 0.0f;
-                fade_state = STATE_WAITING;
-                face_timer = 0;
-            }
-            break;
-    }
 
-    // --- WINK LOGIC ---
-    // Only attempt to wink if the face is currently visible
-    if (fade_state == STATE_HOLDING && face_alpha > 0.8f) {
-        if (!is_winking) {
-            // ~1% chance to wink every frame (~1 wink every few seconds)
-            if (rand() % 100 == 0) {
-                is_winking = 1;
-                // Wink duration between 8 and 15 frames (120ms - 240ms)
-                wink_duration = 8 + (rand() % 8); 
+        case STATE_SMILING:
+            smile_factor += 0.01f; // Gradually transition the frames
+            if (smile_factor >= 1.0f) {
+                smile_factor = 1.0f;
+                fade_state = STATE_HOLDING;
+                state_timer = 0;
             }
-        } else {
-            // Count down the wink duration
-            wink_duration--;
-            if (wink_duration <= 0) {
-                is_winking = 0; // Open eyes again
+            break;
+
+        case STATE_HOLDING:
+            // 180 frames at ~60 FPS is exactly 3 seconds
+            if (state_timer > 180) { 
+                fade_state = STATE_FADING_OUT;
+                state_timer = 0;
             }
-        }
-    } else {
-        is_winking = 0; // Ensure eyes are open if fading out
+            break;
+
+        case STATE_FADING_OUT:
+            // Fade the face to black while running the smile backwards
+            face_alpha -= 0.01f;
+            smile_factor -= 0.01f;
+            
+            if (face_alpha <= 0.0f) face_alpha = 0.0f;
+            if (smile_factor <= 0.0f) smile_factor = 0.0f;
+
+            if (face_alpha == 0.0f && smile_factor == 0.0f) {
+                fade_state = STATE_WAITING;
+                state_timer = 0;
+            }
+            break;
     }
 
     glutPostRedisplay();
-    glutTimerFunc(16, update_logic, 0);
+    glutTimerFunc(16, update_logic, 0); // ~60 FPS
 }
 
 void reshape(int w, int h) {
@@ -256,10 +275,9 @@ int main(int argc, char **argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
     glutInitWindowSize(window_w, window_h);
-    glutCreateWindow("GLMatrix Face Winking");
+    glutCreateWindow("GLMatrix Face Smiley");
 
-    // Load both animation frames
-    load_images("images/face.jpg", "images/facewink.jpg");
+    load_images("images/face1.jpg", "images/face2.jpg", "images/face3.jpg");
 
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
