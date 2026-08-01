@@ -20,7 +20,7 @@ int num_cols = 0;
 int num_rows = 0;
 int char_w = 10;
 int char_h = 14; 
-int window_w = 800, window_h = 600;
+int window_w = 1280, window_h = 768;
 
 // 3 Image Frames
 unsigned char *img_frames[3] = {NULL, NULL, NULL};
@@ -71,6 +71,7 @@ void load_images(const char *file1, const char *file2, const char *file3) {
     img_h = h[0];
 }
 
+// Matrix-like rain "drops" + grid
 void init_rain() {
     num_cols = window_w / char_w;
     num_rows = window_h / char_h;
@@ -94,6 +95,7 @@ void draw_char(float x, float y, char c, float r, float g, float b) {
     glutBitmapCharacter(GLUT_BITMAP_8_BY_13, c);
 }
 
+// OpenGL/GLUT context window
 void display() {
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
