@@ -71,6 +71,7 @@ void load_images(const char *file1, const char *file2, const char *file3) {
     img_h = h[0];
 }
 
+// Martrix-like rain "drops" + grid
 void init_rain() {
     num_cols = window_w / char_w;
     num_rows = window_h / char_h;
@@ -94,6 +95,7 @@ void draw_char(float x, float y, char c, float r, float g, float b) {
     glutBitmapCharacter(GLUT_BITMAP_8_BY_13, c);
 }
 
+// OpenGL/GLUT context window
 void display() {
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
