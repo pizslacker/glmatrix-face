@@ -71,7 +71,7 @@ void load_images(const char *file1, const char *file2, const char *file3) {
     img_h = h[0];
 }
 
-// Martrix-like rain "drops" + grid
+// Matrix-like rain "drops" + grid
 void init_rain() {
     num_cols = window_w / char_w;
     num_rows = window_h / char_h;
