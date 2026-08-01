@@ -10,4 +10,4 @@ This version uses a _Grid State_ rendering engine, insted of drawing arbitrary f
 
 The name says it all :P
 
-![Cmatrix-Face in action...](https://github.com/pizslacker/glmatrix-face/blob/main/images/glmatrix-face.png)
+![Cmatrix-Face in action...](https://github.com/pizslacker/glmatrix-face/blob/main/images/glmatrix-fac.png)
