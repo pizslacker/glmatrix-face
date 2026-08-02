@@ -1,4 +1,9 @@
-#include <GL/glut.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <GL/gl.h>
+#include <GL/glx.h>
+#include <unistd.h>
+#include <sys/time.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
@@ -22,7 +27,10 @@ int char_w = 10;
 int char_h = 14; 
 int window_w = 800, window_h = 600;
 
-// 3 Image Frames
+// X11 fonts
+GLuint font_base;
+
+// Image Frames
 unsigned char *img_frames[3] = {NULL, NULL, NULL};
 int img_w, img_h, img_channels;
 
@@ -40,15 +48,6 @@ typedef enum {
 } FadeState;
 
 FadeState fade_state = STATE_WAITING;
-
-void keyboard_input(unsigned char key, int x, int y) {
-    if (key == 27) { 
-        for (int i = 0; i < 3; i++) {
-            if (img_frames[i]) free(img_frames[i]);
-        }
-        exit(0); 
-    }
-}
 
 void load_images(const char *file1, const char *file2, const char *file3) {
     const char *filenames[3] = {file1, file2, file3};
@@ -91,7 +90,7 @@ void init_rain() {
 void draw_char(float x, float y, char c, float r, float g, float b) {
     glColor3f(r, g, b);
     glRasterPos2f(x, y + char_h);
-    glutBitmapCharacter(GLUT_BITMAP_8_BY_13, c);
+    glCallList(font_base + c);
 }
 
 void display() {
@@ -173,8 +172,6 @@ void display() {
             }
         }
     }
-
-    glutSwapBuffers();
 }
 
 void update_logic(int value) {
@@ -203,7 +200,7 @@ void update_logic(int value) {
         }
     }
 
-    // 2. State Machine Logic
+    // State Machine Logic
     state_timer++;
     switch (fade_state) {
         case STATE_WAITING:
@@ -253,37 +250,80 @@ void update_logic(int value) {
             }
             break;
     }
-
-    glutPostRedisplay();
-    glutTimerFunc(16, update_logic, 0); // ~60 FPS
-}
-
-void reshape(int w, int h) {
-    window_w = w;
-    window_h = h;
-    glViewport(0, 0, w, h);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluOrtho2D(0, w, h, 0);
-    glMatrixMode(GL_MODELVIEW);
-    init_rain();
 }
 
 int main(int argc, char **argv) {
+    Display *dpy = XOpenDisplay(NULL);
+    if (!dpy) {
+        fprintf(stderr, "Cannot connect to X server\n");
+        exit(1);
+    }
+
+    Window win;
+    char *xss_env = getenv("XSCREENSAVER_WINDOW");
+    
+    if (xss_env) {
+        // xscreensaver passes the window ID via this environment variable
+        win = (Window)strtol(xss_env, NULL, 0); 
+    } else {
+        // Fallback: Create a window if run directly from the terminal
+        int screen = DefaultScreen(dpy);
+        win = XCreateSimpleWindow(dpy, RootWindow(dpy, screen), 0, 0, 800, 600, 0, 0, 0);
+        XMapWindow(dpy, win);
+    }
+
+    // Initialize GLX context
+    GLint attr[] = {GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, None};
+    XVisualInfo *vi = glXChooseVisual(dpy, DefaultScreen(dpy), attr);
+    GLXContext glc = glXCreateContext(dpy, vi, NULL, GL_TRUE);
+    glXMakeCurrent(dpy, win, glc);
+
+    // Load standard X11 fixed font for the matrix characters
+    XFontStruct *font_info = XLoadQueryFont(dpy, "fixed");
+    if (!font_info) {
+        fprintf(stderr, "X11 fixed font not found.\n");
+        exit(1);
+    }
+    font_base = glGenLists(256);
+    glXUseXFont(font_info->fid, 0, 256, font_base);
+
+    // Determine the actual window dimensions provided by xscreensaver
+    XWindowAttributes wa;
+    XGetWindowAttributes(dpy, win, &wa);
+    window_w = wa.width;
+    window_h = wa.height;
+
+    glViewport(0, 0, window_w, window_h);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    // Use standard orthogonal projection instead of gluOrtho2D
+    glOrtho(0, window_w, window_h, 0, -1.0, 1.0); 
+    glMatrixMode(GL_MODELVIEW);
+
     srand(time(NULL));
-
-    glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
-    glutInitWindowSize(window_w, window_h);
-    glutCreateWindow("GLMatrix Face Smiley");
-
     load_images("images/face1.jpg", "images/face2.jpg", "images/face3.jpg");
+    init_rain();
 
-    glutDisplayFunc(display);
-    glutReshapeFunc(reshape);
-    glutKeyboardFunc(keyboard_input);
-    glutTimerFunc(16, update_logic, 0);
+    // The native event loop
+    while (1) {
+        // Handle window resizing and termination
+        while (XPending(dpy)) {
+            XEvent xev;
+            XNextEvent(dpy, &xev);
+            if (xev.type == DestroyNotify) {
+                glXMakeCurrent(dpy, None, NULL);
+                glXDestroyContext(dpy, glc);
+                XCloseDisplay(dpy);
+                exit(0);
+            }
+        }
 
-    glutMainLoop();
+        update_logic(0);
+        display();
+        glXSwapBuffers(dpy, win);
+
+        usleep(16000); // 16ms delay (~60 FPS)
+    }
+
     return 0;
 }
