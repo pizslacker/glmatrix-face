@@ -94,7 +94,7 @@ void draw_char(float x, float y, char c, float r, float g, float b) {
     glCallList(font_base + c);
 }
 
-// OpenGL/GLUT context window
+// X11/OpenGL context window
 void display() {
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
