@@ -275,9 +275,9 @@ int main(int argc, char **argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
     glutInitWindowSize(window_w, window_h);
-    glutCreateWindow("Cipher Face Matrix - Gradual Smile");
+    glutCreateWindow("GLMatrix Face Smiley");
 
-    load_images("face1.jpg", "face2.jpg", "face3.jpg");
+    load_images("images/face1.jpg", "images/face2.jpg", "images/face3.jpg");
 
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
