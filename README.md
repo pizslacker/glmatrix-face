@@ -1,6 +1,6 @@
 # glmatrix-face
 
-An example C program that demonstrates _Text Mosaic Mapping_ with `X11/GLX` for _ASCII_-like image terminal art and animated _matrix_-like scrolling cipher code.
+An example C program that demonstrates _Text Mosaic Mapping_ with `OpenGL/GLUT` for _ASCII_-like image terminal art and animated _matrix_-like scrolling cipher code.
 
 Do not confuse this project with the official `glmatrix` Xscreensaver. No affiliation.
 
