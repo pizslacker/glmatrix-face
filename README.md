@@ -1,6 +1,8 @@
-# glmatrix-face Xscreensaver
+# glmatrix-face
 
-An example C programmed Xscreensaver that demonstrates _Text Mosaic Mapping_ with `X11/GLX` for _ASCII_-like image terminal art and animated _matrix_-like scrolling cipher code.
+An example C program that demonstrates _Text Mosaic Mapping_ with `X11/GLX` for _ASCII_-like image terminal art and animated _matrix_-like scrolling cipher code.
+
+Do not confuse this project with the official `glmatrix` Xscreensaver. No affiliation.
 
 This version uses a _Grid State_ rendering engine, insted of drawing arbitrary floating coordinates, and manages a rigid 2D array of character cells (like a real terminal).
 - Pixel mapping for every character cell
