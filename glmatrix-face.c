@@ -270,7 +270,7 @@ int main(int argc, char **argv) {
     } else {
         // Fallback: Create a window if run directly from the terminal
         int screen = DefaultScreen(dpy);
-        win = XCreateSimpleWindow(dpy, RootWindow(dpy, screen), 0, 0, 800, 600, 0, 0, 0);
+        win = XCreateSimpleWindow(dpy, RootWindow(dpy, screen), 0, 0, 1280, 768, 0, 0, 0);
         XMapWindow(dpy, win);
     }
 
