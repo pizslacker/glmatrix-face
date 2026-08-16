@@ -4,6 +4,9 @@ An example C program that demonstrates _Text Mosaic Mapping_ with `OpenGL/GLUT` 
 
 Do not confuse this project with the official `glmatrix` Xscreensaver. No affiliation.
 
+Demo video:
+https://www.youtube.com/watch?v=5DhFIHp6pqg
+
 This version uses a _Grid State_ rendering engine, insted of drawing arbitrary floating coordinates, and manages a rigid 2D array of character cells (like a real terminal).
 - Pixel mapping for every character cell
 - Cipher blend (for every character overlapping face image)
