@@ -4,6 +4,8 @@ An example C program that demonstrates _Text Mosaic Mapping_ with `OpenGL/GLUT` 
 
 Do not confuse this project with the official `glmatrix` Xscreensaver. No affiliation.
 
+The image library used, can be found here: https://github.com/nothings/stb
+
 Demo video:
 https://www.youtube.com/watch?v=5DhFIHp6pqg
 
