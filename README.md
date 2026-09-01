@@ -6,6 +6,10 @@ Do not confuse this project with the official `glmatrix` Xscreensaver. No affili
 
 The image library used, can be found here: https://github.com/nothings/stb
 
+  ```
+  Public domain code has no copyright restrictions, making it perfectly compatible with all versions of the GNU General Public License (GPL). When you combine them, the project as a whole will be distributed under the GPL.
+  ```
+
 Demo video:
 https://www.youtube.com/watch?v=5DhFIHp6pqg
 
